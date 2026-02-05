@@ -24,17 +24,48 @@ std::pair<std::unique_ptr<Loader>, std::string> Loader::create(const std::filesy
 Loader::Status Loader::checkStatus(const fs::path& buildDir) {
     Status status;
 
-    // Compute current sha1
-    status.buildNinjaSha1 = m_computeSha1(buildDir / "build.ninja");
-    status.ninjaDepsSha1 = m_computeSha1(buildDir / ".ninja_deps");
+    // Get file paths
+    fs::path buildNinjaPath = buildDir / "build.ninja";
+    fs::path ninjaDepsPath = buildDir / ".ninja_deps";
 
-    // Get stored sha1
-    std::string storedBuildSha1 = m_db.getMetadata("build_ninja_sha1");
-    std::string storedDepsSha1 = m_db.getMetadata("ninja_deps_sha1");
+    // Get current file modification times
+    std::error_code ec;
+    if (fs::exists(buildNinjaPath, ec)) {
+        status.buildNinjaTime = fs::last_write_time(buildNinjaPath, ec);
+    }
+    if (fs::exists(ninjaDepsPath, ec)) {
+        status.ninjaDepsTime = fs::last_write_time(ninjaDepsPath, ec);
+    }
 
-    // Compare
-    status.buildNinjaChanged = (status.buildNinjaSha1 != storedBuildSha1);
-    status.ninjaDepsChanged = (status.ninjaDepsSha1 != storedDepsSha1);
+    // Get stored timestamps (stored as nanoseconds since epoch)
+    std::string storedBuildTime = m_db.getMetadata("build_ninja_time");
+    std::string storedDepsTime = m_db.getMetadata("ninja_deps_time");
+
+    // Convert current file times to nanoseconds for comparison
+    auto buildTimeNanos = status.buildNinjaTime.time_since_epoch().count();
+    auto depsTimeNanos = status.ninjaDepsTime.time_since_epoch().count();
+
+    // Check if timestamps have changed
+    bool buildTimeChanged = (storedBuildTime.empty() || storedBuildTime != ez::str::toStr(buildTimeNanos));
+    bool depsTimeChanged = (storedDepsTime.empty() || storedDepsTime != ez::str::toStr(depsTimeNanos));
+
+    // Only compute SHA1 if timestamps have changed
+    if (buildTimeChanged) {
+        status.buildNinjaSha1 = m_computeSha1(buildNinjaPath);
+        std::string storedBuildSha1 = m_db.getMetadata("build_ninja_sha1");
+        status.buildNinjaChanged = (status.buildNinjaSha1 != storedBuildSha1);
+    } else {
+        status.buildNinjaChanged = false;
+    }
+
+    if (depsTimeChanged) {
+        status.ninjaDepsSha1 = m_computeSha1(ninjaDepsPath);
+        std::string storedDepsSha1 = m_db.getMetadata("ninja_deps_sha1");
+        status.ninjaDepsChanged = (status.ninjaDepsSha1 != storedDepsSha1);
+    } else {
+        status.ninjaDepsChanged = false;
+    }
+
     status.needsRebuild = (status.buildNinjaChanged || status.ninjaDepsChanged);
 
     return status;
@@ -56,7 +87,7 @@ std::vector<std::string> Loader::getAllTargetsByType(datas::TargetType aTargetTy
         ret = m_db.getAllTargetsByType(aTargetType);
     }
     if (!ret.empty()) {
-        m_db.setMetadata("perf_query_ms", ez::str::toStr(query_timing));
+        m_db.setMetadata("perf_query_ms", query_timing);
     }
     return ret;
 }
@@ -69,7 +100,7 @@ std::vector<std::string> Loader::getPointedTargetsByType(const std::vector<std::
         ret = m_db.getPointedTargetsByType(sourcePaths, aTargetType);
     }
     if (!ret.empty()) {
-        m_db.setMetadata("perf_query_ms", ez::str::toStr(query_timing));
+        m_db.setMetadata("perf_query_ms", query_timing);
     }
     return ret;
 }
@@ -103,14 +134,23 @@ bool Loader::m_load(const fs::path& buildDir, bool force) {
             return false;
         }
     }
-    m_db.setMetadata("perf_db_loading_ms", ez::str::toStr(db_loading_timing));
+    m_db.setMetadata("perf_db_loading_ms", db_loading_timing);
 
     fs::path buildNinjaPath = buildDir / "build.ninja";
     fs::path ninjaDepsPath = buildDir / ".ninja_deps";
 
     // Check if rebuild needed
     Status status = checkStatus(buildDir);
+
+    // If timestamps changed but SHA1s match, update timestamps without rebuild
     if (!force && !status.needsRebuild) {
+        // Update timestamps if they were checked and SHA1s were calculated but matched
+        if (!status.buildNinjaSha1.empty()) {
+            m_db.setMetadata("build_ninja_time", status.buildNinjaTime.time_since_epoch().count());
+        }
+        if (!status.ninjaDepsSha1.empty()) {
+            m_db.setMetadata("ninja_deps_time", status.ninjaDepsTime.time_since_epoch().count());
+        }
         return true;  // Nothing to do
     }
 
@@ -169,9 +209,11 @@ bool Loader::m_load(const fs::path& buildDir, bool force) {
            }
        }
 
-       // Store SHA1s
+       // Store SHA1s and timestamps
        m_db.setMetadata("build_ninja_sha1", status.buildNinjaSha1);
        m_db.setMetadata("ninja_deps_sha1", status.ninjaDepsSha1);
+       m_db.setMetadata("build_ninja_time", status.buildNinjaTime.time_since_epoch().count());
+       m_db.setMetadata("ninja_deps_time", status.ninjaDepsTime.time_since_epoch().count());
        m_db.setMetadata("build_dir", buildDir.string());
 
        // Commit
@@ -182,7 +224,7 @@ bool Loader::m_load(const fs::path& buildDir, bool force) {
        }
     }
 
-    m_db.setMetadata("perf_db_filling_ms", ez::str::toStr(db_filling_timing));
+    m_db.setMetadata("perf_db_filling_ms", db_filling_timing);
 
     return true;
 }
