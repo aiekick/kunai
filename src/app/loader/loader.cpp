@@ -5,6 +5,7 @@
 #include <ezlibs/ezTime.hpp>
 
 #include <app/headers/defs.hpp>
+#include <app/parsers/cmake_reply_parser.h>
 
 namespace fs = std::filesystem;
 
@@ -197,6 +198,9 @@ bool Loader::m_load(const fs::path& buildDir, bool force) {
        // Clear and reload
        m_db.clear();
 
+       // Initialize default file extensions
+       m_db.initializeDefaultExtensions();
+
        // Insert build links
        for (const auto& link : pBuildParser->getLinks()) {
            m_db.insertBuildLink(link);
@@ -208,6 +212,15 @@ bool Loader::m_load(const fs::path& buildDir, bool force) {
                m_db.insertDepsEntry(entry);
            }
        }
+
+       // Parse CMake reply files (optional)
+       auto tmp_pCMakeParser = cmake::CMakeReplyParser::create(buildDir.string());
+       if (tmp_pCMakeParser.first != nullptr) {
+           for (const auto& target : tmp_pCMakeParser.first->getTargets()) {
+               m_db.insertCMakeTarget(target);
+           }
+       }
+       // Note: CMake reply parsing failures are not fatal - it's an optional enhancement
 
        // Store SHA1s and timestamps
        m_db.setMetadata("build_ninja_sha1", status.buildNinjaSha1);

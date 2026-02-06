@@ -12,6 +12,9 @@
 #include <type_traits>
 
 namespace kunai {
+namespace cmake {
+    struct CMakeTarget;  // Forward declaration
+}
 
 class DataBase {
 public:
@@ -23,6 +26,7 @@ public:
             int64_t objects{};
             int64_t libraries{};
             int64_t binaries{};
+            int64_t inputs{};
         } counters;
         struct Timing {
             double dbFilling{};
@@ -62,6 +66,12 @@ public:
     void clear();
     void insertBuildLink(const datas::BuildLink& link);
     void insertDepsEntry(const datas::DepsEntry& deps);
+    void insertCMakeTarget(const cmake::CMakeTarget& target);
+
+    // File extension management
+    void addFileExtension(const std::string& ext, datas::TargetType type);
+    datas::TargetType getFileExtensionType(const std::string& ext) const;
+    void initializeDefaultExtensions();
 
     // Metadata
     void setMetadata(const std::string& key, const std::string& value);

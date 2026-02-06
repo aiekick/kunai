@@ -35,8 +35,8 @@ inline std::set<std::string> HEADER_FILE_EXTS{
     ".tpp",  // Template implementations
     ".tcc",  // Template implementations (alternative)
     ".ipp",  // Inline/implementation header
-    ".inl",  // Inline header (parfois utilisé aussi comme header)
-    ".inc"   // Include file (utilisé dans certains projets)
+    ".inl",  // Inline header (parfois utilisï¿½ aussi comme header)
+    ".inc"   // Include file (utilisï¿½ dans certains projets)
 };
 
 inline std::set<std::string> LIBRARY_FILE_EXTS{
@@ -46,7 +46,7 @@ inline std::set<std::string> LIBRARY_FILE_EXTS{
     ".lib",       // Static library (Windows) ou import library
     ".dll",       // Dynamic-link library (Windows)
     ".dll.a",     // Import library (MinGW)
-    ".framework"  // Framework bundle (macOS) - techniquement un répertoire
+    ".framework"  // Framework bundle (macOS) - techniquement un rï¿½pertoire
 };
 
 enum class TargetType {
@@ -55,7 +55,8 @@ enum class TargetType {
     HEADER,
     OBJECT,
     LIBRARY,
-    BINARY
+    BINARY,
+    INPUT
 };
 
 struct BuildLink {

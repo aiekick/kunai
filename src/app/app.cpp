@@ -118,6 +118,7 @@ int32_t App::m_cmdStats() const {
         tbl.addRow({"Objects", ez::str::toStr(stats.counters.objects)});
         tbl.addRow({"Libraries", ez::str::toStr(stats.counters.libraries)});
         tbl.addRow({"Binaries", ez::str::toStr(stats.counters.binaries)});
+        tbl.addRow({"Inputs", ez::str::toStr(stats.counters.inputs)});
         tbl.print("", std::cout);
     }
     {
