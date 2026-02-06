@@ -9,6 +9,7 @@
 #include <memory>
 #include <sstream>
 #include <filesystem>
+#include <type_traits>
 
 namespace kunai {
 
@@ -64,6 +65,14 @@ public:
 
     // Metadata
     void setMetadata(const std::string& key, const std::string& value);
+
+    // Template version for automatic conversion of numeric types
+    template<typename T>
+    typename std::enable_if<std::is_arithmetic<T>::value, void>::type
+    setMetadata(const std::string& key, T value) {
+        setMetadata(key, std::to_string(value));
+    }
+
     std::string getMetadata(const std::string& key);
 
     // Queries
