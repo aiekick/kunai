@@ -1,6 +1,6 @@
 #include "model.h"
 
-#include <sqlite3/sqlite3.hpp>
+#include <sqlite3/sqlite3.h>
 
 #include <ezlibs/ezStr.hpp>
 #include <ezlibs/ezTime.hpp>
@@ -15,6 +15,12 @@ namespace fs = std::filesystem;
 namespace kunai {
 
 using namespace datas;
+
+void DataBase::SqliteDeleter::operator()(sqlite3* apDB) {
+    if (apDB) {
+        sqlite3_close(apDB);
+    }
+}
 
 DataBase::DataBase() = default;
 DataBase::~DataBase() {

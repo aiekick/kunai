@@ -1,7 +1,5 @@
 #pragma once
 
-#include <sqlite3/sqlite3.hpp>
-
 #include <app/headers/defs.hpp>
 
 #include <string>
@@ -10,6 +8,8 @@
 #include <sstream>
 #include <filesystem>
 #include <type_traits>
+
+struct sqlite3;
 
 namespace kunai {
 namespace cmake {
@@ -37,11 +37,7 @@ public:
 
 private:
     struct SqliteDeleter {
-        void operator()(sqlite3* apDB) {
-            if (apDB) {
-                sqlite3_close(apDB);
-            }
-        }
+        void operator()(sqlite3* apDB);
     };
     std::unique_ptr<sqlite3, SqliteDeleter> mp_db;
     mutable std::stringstream m_error;
