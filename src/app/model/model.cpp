@@ -12,6 +12,8 @@ namespace fs = std::filesystem;
 
 namespace kunai {
 
+using namespace datas;
+
 DataBase::DataBase() = default;
 DataBase::~DataBase() {
     close();
@@ -64,14 +66,14 @@ void DataBase::clear() {
     m_exec("DELETE FROM metadata;");
 }
 
-void DataBase::insertBuildLink(const datas::BuildLink& link) {
+void DataBase::insertBuildLink(const BuildLink& link) {
     const auto type = m_getTargetType(link.rule, link.target);
-    if (type != datas::TargetType::NOT_SUPPORTED) {
+    if (type != TargetType::NOT_SUPPORTED) {
         const int64_t targetId = m_getOrCreateNode(link.target, type);
         // les .o (.cpp.o) sont en explicits
         for (const auto& dep : link.explicit_deps) {
             const auto depType = m_getTargetType("", dep);
-            if (depType != datas::TargetType::NOT_SUPPORTED) {
+            if (depType != TargetType::NOT_SUPPORTED) {
                 const int64_t depId = m_getOrCreateNode(dep, depType);
                 m_insertLink(targetId, depId);
             }
@@ -79,14 +81,14 @@ void DataBase::insertBuildLink(const datas::BuildLink& link) {
         // les .so sont en implcities
         for (const auto& dep : link.implicit_deps) {
             const auto depType = m_getTargetType("", dep);
-            if (depType != datas::TargetType::NOT_SUPPORTED) {
+            if (depType != TargetType::NOT_SUPPORTED) {
                 const int64_t depId = m_getOrCreateNode(dep, depType);
                 m_insertLink(targetId, depId);
             }
         }
         for (const auto& dep : link.order_only) {
             const auto depType = m_getTargetType("", dep);
-            if (depType != datas::TargetType::NOT_SUPPORTED) {
+            if (depType != TargetType::NOT_SUPPORTED) {
                 const int64_t depId = m_getOrCreateNode(dep, depType);
                 m_insertLink(targetId, depId);
             }
@@ -94,13 +96,13 @@ void DataBase::insertBuildLink(const datas::BuildLink& link) {
     }
 }
 
-void DataBase::insertDepsEntry(const datas::DepsEntry& deps) {
+void DataBase::insertDepsEntry(const DepsEntry& deps) {
     const auto type = m_getTargetType("", deps.target);
-    if (type != datas::TargetType::NOT_SUPPORTED) {
+    if (type != TargetType::NOT_SUPPORTED) {
         const int64_t targetId = m_getOrCreateNode(deps.target, type);
         for (const auto& dep : deps.deps) {
             const auto depType = m_getTargetType("", dep);
-            if (depType != datas::TargetType::NOT_SUPPORTED) {
+            if (depType != TargetType::NOT_SUPPORTED) {
                 const int64_t depId = m_getOrCreateNode(dep, depType);
                 m_insertLink(targetId, depId);
             }
@@ -172,7 +174,7 @@ DataBase::Stats DataBase::getStats() const {
     return stats;
 }
 
-std::vector<std::string> DataBase::getAllTargetsByType(datas::TargetType aTargetType) const {
+std::vector<std::string> DataBase::getAllTargetsByType(TargetType aTargetType) const {
     std::vector<std::string> ret;
     sqlite3_stmt* stmt{nullptr};
     if (sqlite3_prepare_v2(mp_db.get(), "SELECT path FROM targets WHERE type = ?", -1, &stmt, nullptr) == SQLITE_OK) {
@@ -185,7 +187,7 @@ std::vector<std::string> DataBase::getAllTargetsByType(datas::TargetType aTarget
     return ret;
 }
 
-std::vector<std::string> DataBase::getPointedTargetsByType(const std::vector<std::string>& sourcePaths, datas::TargetType aTargetType) const {
+std::vector<std::string> DataBase::getPointedTargetsByType(const std::vector<std::string>& sourcePaths, TargetType aTargetType) const {
     std::vector<std::string> ret;
 
     if (sourcePaths.empty()) {
@@ -280,39 +282,34 @@ bool DataBase::m_createSchema() {
     return m_exec(schema);
 }
 
-datas::TargetType DataBase::m_getTargetType(const std::string& aRule, const std::string& aTarget) const {
+TargetType DataBase::m_getTargetType(const std::string& aRule, const std::string& aTarget) const {
     if (!aRule.empty() && aRule != "CUSTOM_COMMAND") {
         if (aRule.find("MODULE") != std::string::npos) {
-            return datas::TargetType::LIBRARY;
+            return TargetType::LIBRARY;
         } else if (aRule.find("LIBRARY") != std::string::npos) {
-            return datas::TargetType::LIBRARY;
+            return TargetType::LIBRARY;
         } else if (aRule.find("EXECUTABLE") != std::string::npos) {
-            return datas::TargetType::BINARY;
+            return TargetType::BINARY;
         }
     } else {
-        if (ez::str::endsWith(aTarget, ".o")) {
-            return datas::TargetType::OBJECT;
-        }
-        for (const auto& a : datas::LIBRARY_FILE_EXTS) {
-            if (ez::str::endsWith(aTarget, a)) {
-                return datas::TargetType::LIBRARY;
-            }
-        }
-        for (const auto& a : datas::SOURCE_FILE_EXTS) {
-            if (ez::str::endsWith(aTarget, a)) {
-                return datas::TargetType::SOURCE;
-            }
-        }
-        for (const auto& a : datas::HEADER_FILE_EXTS) {
-            if (ez::str::endsWith(aTarget, a)) {
-                return datas::TargetType::HEADER;
-            }
+        const auto p = aTarget.find_last_of('.');
+        if (p != std::string::npos) {
+            const auto ext = aTarget.substr(p);
+            if (ext == ".o") {
+                return TargetType::OBJECT;
+            } else if (LIBRARY_FILE_EXTS.find(ext) != LIBRARY_FILE_EXTS.end()) {
+                return TargetType::LIBRARY;
+            } else if (SOURCE_FILE_EXTS.find(ext) != SOURCE_FILE_EXTS.end()) {
+                return TargetType::SOURCE;
+            } else if (HEADER_FILE_EXTS.find(ext) != HEADER_FILE_EXTS.end()) {
+                return TargetType::HEADER;
+            }             
         }
     }
-    return datas::TargetType::NOT_SUPPORTED;
+    return TargetType::NOT_SUPPORTED;
 }
 
-int64_t DataBase::m_getOrCreateNode(const std::string& path, datas::TargetType type) {
+int64_t DataBase::m_getOrCreateNode(const std::string& path, TargetType type) {
     sqlite3_stmt* stmt{nullptr};
 
     // Try to find existing
@@ -327,7 +324,7 @@ int64_t DataBase::m_getOrCreateNode(const std::string& path, datas::TargetType t
 
     if (id >= 0) {
         // Update type if provided
-        if (type != datas::TargetType::NOT_SUPPORTED) {
+        if (type != TargetType::NOT_SUPPORTED) {
             sqlite3_prepare_v2(mp_db.get(), "UPDATE targets SET type = ? WHERE id = ?", -1, &stmt, nullptr);
             sqlite3_bind_int(stmt, 1, static_cast<int32_t>(type));
             sqlite3_bind_int64(stmt, 2, id);

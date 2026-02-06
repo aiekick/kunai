@@ -25,7 +25,8 @@ bool App::init(int32_t argc, char** argv) {
     m_args.addHeader("parse Ninja files and Find which executables to rebuild for changed file(s)");
 
     m_args.addPositional("build_dir").help("The build directory", "<build_dir>");
-    m_args.addOptional("--rebuild").help("Force the kunia database rebuild", {});
+    m_args.addOptional("-r/--rebuild").help("Force the kunia database rebuild", {});
+    m_args.addOptional("-t/--time").help("print the time perf of the command", {});
 
     // command stats
     m_args.addCommand("stats").help("Get stats of the kunai database", {});
@@ -60,15 +61,6 @@ bool App::init(int32_t argc, char** argv) {
         }
         m_buildDir = build_dir;
 
-        {  // loader
-            auto tmp_pLoader = Loader::create(m_buildDir, m_args.isPresent("rebuild"));
-            if (tmp_pLoader.first == nullptr) {
-                std::cerr << "Error loading build dir " << m_buildDir << " : " << tmp_pLoader.second << std::endl;
-                return false;
-            }
-            mp_loader = std::move(tmp_pLoader.first);
-        }
-
         return true;
     } else {
         m_args.printErrors(" - ");
@@ -82,12 +74,27 @@ bool App::init(int32_t argc, char** argv) {
 int32_t App::run() {
     int32_t ret{EXIT_FAILURE};
     try {
-        if (m_args.isCommand("stats")) {
-            ret = m_cmdStats();
-        } else if (m_args.isCommand("all")) {
-            ret = m_cmdAllTargetsByType();
-        } else if (m_args.isCommand("pointed")) {
-            ret = m_cmdPointedTargetsByType();
+        double timing{};
+        {
+            ez::time::ScopedTimer t(timing);
+
+            auto tmp_pLoader = Loader::create(m_buildDir, m_args.isPresent("rebuild"));
+            if (tmp_pLoader.first == nullptr) {
+                std::cerr << "Error loading build dir " << m_buildDir << " : " << tmp_pLoader.second << std::endl;
+                return false;
+            }
+            mp_loader = std::move(tmp_pLoader.first);
+
+            if (m_args.isCommand("stats")) {
+                ret = m_cmdStats();
+            } else if (m_args.isCommand("all")) {
+                ret = m_cmdAllTargetsByType();
+            } else if (m_args.isCommand("pointed")) {
+                ret = m_cmdPointedTargetsByType();
+            }
+        }
+        if (m_args.isPresent("time")) {
+            std::cout << "[retrieved in " << timing << " ms]" << std::endl;
         }
     } catch (const fs::filesystem_error& e) {
         std::cerr << "Err : " << e.what() << std::endl;
@@ -170,7 +177,7 @@ int32_t App::m_printTargets(const std::set<std::string>& aTargets) const {
     if (aTargets.empty()) {
         return EXIT_FAILURE;
     }
-    auto pattern = ez::str::toLower(m_args.getValue<std::string>("match"));
+    const auto pattern = ez::str::toLower(m_args.getValue<std::string>("match"));
     for (const auto& target : aTargets) {
         if ((pattern.empty()) ||  //
             (!ez::str::searchForPatternWithWildcards(ez::str::toLower(target), pattern).empty())) {
