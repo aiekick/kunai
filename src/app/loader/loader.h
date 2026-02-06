@@ -29,6 +29,8 @@ public:
         bool ninjaDepsChanged = false;
         std::string buildNinjaSha1;
         std::string ninjaDepsSha1;
+        std::filesystem::file_time_type buildNinjaTime;
+        std::filesystem::file_time_type ninjaDepsTime;
     };
 
     static std::pair<std::unique_ptr<Loader>, std::string> create(  //
