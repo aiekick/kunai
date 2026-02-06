@@ -3,6 +3,7 @@
 #include <sqlite3/sqlite3.hpp>
 
 #include <app/headers/defs.hpp>
+#include <app/model/database_writer.h>
 
 #include <string>
 #include <vector>
@@ -16,7 +17,7 @@ namespace cmake {
     struct CMakeTarget;  // Forward declaration
 }
 
-class DataBase {
+class DataBase : public IDataBaseWriter {
 public:
     struct Stats {
         struct Counter {
@@ -64,13 +65,13 @@ public:
 
     // Insertions
     void clear();
-    void insertBuildLink(const datas::BuildLink& link);
-    void insertDepsEntry(const datas::DepsEntry& deps);
-    void insertCMakeTarget(const cmake::CMakeTarget& target);
+    void insertBuildLink(const datas::BuildLink& link) override;
+    void insertDepsEntry(const datas::DepsEntry& deps) override;
+    void insertCMakeTarget(const cmake::CMakeTarget& target) override;
 
     // File extension management
-    void addFileExtension(const std::string& ext, datas::TargetType type);
-    datas::TargetType getFileExtensionType(const std::string& ext) const;
+    void addFileExtension(const std::string& ext, datas::TargetType type) override;
+    datas::TargetType getFileExtensionType(const std::string& ext) const override;
     void initializeDefaultExtensions();
 
     // Metadata

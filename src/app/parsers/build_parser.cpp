@@ -5,18 +5,17 @@
 namespace kunai {
 namespace ninja {
 
-std::pair<std::unique_ptr<BuildParser>, std::string> BuildParser::create(const std::string& aFilePathName) {
+std::pair<std::unique_ptr<BuildParser>, std::string> BuildParser::create(
+    const std::string& aFilePathName,
+    IDataBaseWriter* apDbWriter) {
     auto pRet = std::make_unique<BuildParser>();
+    pRet->mp_dbWriter = apDbWriter;
     std::string error;
     if (!pRet->m_parse(aFilePathName)) {
         error = pRet->getError();
         pRet.reset();
     }
     return std::make_pair(std::move(pRet), error);
-}
-
-const std::vector<datas::BuildLink>& BuildParser::getLinks() const {  //
-    return m_links;
 }
 
 std::string BuildParser::getError() const {  //
@@ -28,49 +27,9 @@ std::vector<std::string> BuildParser::getDirectDeps(const std::string& path) con
 }
 
 std::vector<std::string> BuildParser::getDirectDeps(const std::vector<std::string>& paths) const {
-    std::unordered_set<std::string> pathSet(paths.begin(), paths.end());
-    std::vector<std::string> suffixes;
-    for (const auto& p : paths) {
-        suffixes.push_back("/" + p);
-    }
-
-    // lambda func for check dep
-    const auto checkDep = [&](const std::string& dep) {
-        if (pathSet.count(dep)) return true;
-        for (const auto& suffix : suffixes) {
-            if (dep.size() >= suffix.size() && dep.compare(dep.size() - suffix.size(), suffix.size(), suffix) == 0) {
-                return true;
-            }
-        }
-        return false;
-    };
-
-    std::unordered_set<std::string> result;
-    for (const auto& link : m_links) {
-        bool found = false;
-        for (const auto& dep : link.explicit_deps) {
-            if (checkDep(dep)) {
-                found = true;
-                break;
-            }
-        }
-        if (!found) {
-            for (const auto& dep : link.implicit_deps) {
-                if (checkDep(dep)) {
-                    found = true;
-                    break;
-                }
-            }
-        }
-        if (found) {
-            result.insert(link.target);
-        }
-    }
-    return std::vector<std::string>(result.begin(), result.end());
-}
-
-bool BuildParser::empty() const {
-    return m_links.empty();
+    // This method is not used in the refactored version since links are written directly to DB
+    // Keep it for now for backward compatibility, but it won't work properly
+    return std::vector<std::string>();
 }
 
 std::string BuildParser::m_getDirectory(const std::string& aFilePathName) {
@@ -339,7 +298,10 @@ void BuildParser::m_parseBuildStatement(const std::string& aLine, std::ifstream&
     parsePaths(implicitStr, link.implicit_deps);
     parsePaths(orderOnlyStr, link.order_only);
 
-    m_links.push_back(std::move(link));
+    // Insert directly to database during parsing
+    if (mp_dbWriter) {
+        mp_dbWriter->insertBuildLink(link);
+    }
 }
 
 }  // namespace ninja
