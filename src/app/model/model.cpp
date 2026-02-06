@@ -1,6 +1,6 @@
 #include "model.h"
 
-#include <sqlite3/sqlite3.hpp>
+#include <sqlite3/sqlite3.h>
 
 #include <ezlibs/ezStr.hpp>
 #include <ezlibs/ezTime.hpp>
@@ -13,6 +13,12 @@ namespace fs = std::filesystem;
 namespace kunai {
 
 using namespace datas;
+
+void DataBase::SqliteDeleter::operator()(sqlite3* apDB) {
+    if (apDB) {
+        sqlite3_close(apDB);
+    }
+}
 
 DataBase::DataBase() = default;
 DataBase::~DataBase() {
@@ -66,7 +72,7 @@ void DataBase::clear() {
     m_exec("DELETE FROM metadata;");
 }
 
-void DataBase::insertBuildLink(const BuildLink& link) {
+void DataBase::insertNinjaBuildLink(const ninja::IBuildWriter::BuildLink& link) {
     const auto type = m_getTargetType(link.rule, link.target);
     if (type != TargetType::NOT_SUPPORTED) {
         const int64_t targetId = m_getOrCreateNode(link.target, type);
@@ -96,7 +102,7 @@ void DataBase::insertBuildLink(const BuildLink& link) {
     }
 }
 
-void DataBase::insertDepsEntry(const DepsEntry& deps) {
+void DataBase::insertNinjaDepsEntry(const ninja::IDepsWriter::DepsEntry& deps) {
     const auto type = m_getTargetType("", deps.target);
     if (type != TargetType::NOT_SUPPORTED) {
         const int64_t targetId = m_getOrCreateNode(deps.target, type);
@@ -107,6 +113,77 @@ void DataBase::insertDepsEntry(const DepsEntry& deps) {
                 m_insertLink(targetId, depId);
             }
         }
+    }
+}
+
+void DataBase::insertCMakeTarget(const cmake::ITargetWriter::Target& target) {
+    // Use target name as the target node
+    const int64_t targetId = m_getOrCreateNode(target.name, target.type);
+
+    // Link all source files to this target
+    for (const auto& source : target.sources) {
+        // Determine source type from extension or from database
+        TargetType sourceType = getFileExtensionType(source);
+        if (sourceType == TargetType::NOT_SUPPORTED) {
+            sourceType = m_getTargetType("", source);
+        }
+
+        if (sourceType != TargetType::NOT_SUPPORTED) {
+            const int64_t sourceId = m_getOrCreateNode(source, sourceType);
+            m_insertLink(targetId, sourceId);
+        }
+    }
+}
+
+void DataBase::addFileExtension(const std::string& ext, TargetType type) {
+    if (type == TargetType::NOT_SUPPORTED || type == TargetType::OBJECT || type == TargetType::BINARY) {
+        return;  // Only SOURCE, HEADER, INPUT, LIBRARY are valid for extensions
+    }
+
+    sqlite3_stmt* stmt{nullptr};
+    sqlite3_prepare_v2(mp_db.get(), "INSERT OR IGNORE INTO file_extensions (ext, type) VALUES (?, ?)", -1, &stmt, nullptr);
+    sqlite3_bind_text(stmt, 1, ext.c_str(), -1, SQLITE_TRANSIENT);
+    sqlite3_bind_int(stmt, 2, static_cast<int32_t>(type));
+    sqlite3_step(stmt);
+    sqlite3_finalize(stmt);
+}
+
+datas::TargetType DataBase::getFileExtensionType(const std::string& path) const {
+    // Extract extension from path
+    size_t dotPos = path.find_last_of('.');
+    if (dotPos == std::string::npos) {
+        return TargetType::NOT_SUPPORTED;
+    }
+
+    std::string ext = path.substr(dotPos);
+
+    sqlite3_stmt* stmt{nullptr};
+    if (sqlite3_prepare_v2(mp_db.get(), "SELECT type FROM file_extensions WHERE ext = ? LIMIT 1", -1, &stmt, nullptr) == SQLITE_OK) {
+        sqlite3_bind_text(stmt, 1, ext.c_str(), -1, SQLITE_TRANSIENT);
+        if (sqlite3_step(stmt) == SQLITE_ROW) {
+            int type = sqlite3_column_int(stmt, 0);
+            sqlite3_finalize(stmt);
+            return static_cast<TargetType>(type);
+        }
+        sqlite3_finalize(stmt);
+    }
+
+    return TargetType::NOT_SUPPORTED;
+}
+
+void DataBase::initializeDefaultExtensions() {
+    // Initialize with default extensions from defs.hpp
+    for (const auto& ext : SOURCE_FILE_EXTS) {
+        addFileExtension(ext, TargetType::SOURCE);
+    }
+    for (const auto& ext : HEADER_FILE_EXTS) {
+        addFileExtension(ext, TargetType::HEADER);
+    }
+    for (const auto& ext : LIBRARY_FILE_EXTS) {
+        addFileExtension(ext, TargetType::LIBRARY);
+    }
+    for (const auto& ext : INPUTS_FILE_EXTS) {
+        addFileExtension(ext, TargetType::INPUT);
     }
 }
 
@@ -143,13 +220,14 @@ DataBase::Stats DataBase::getStats() const {
     Stats stats;
 
     const char* sql = R"(
-        SELECT 
+        SELECT
             (SELECT COUNT(*) FROM links) AS links,
             (SELECT COUNT(*) FROM targets WHERE type = 1) AS sources,
             (SELECT COUNT(*) FROM targets WHERE type = 2) AS headers,
             (SELECT COUNT(*) FROM targets WHERE type = 3) AS objects,
             (SELECT COUNT(*) FROM targets WHERE type = 4) AS libraries,
             (SELECT COUNT(*) FROM targets WHERE type = 5) AS binaries,
+            (SELECT COUNT(*) FROM targets WHERE type = 6) AS inputs,
             (SELECT CAST(value AS REAL) FROM metadata WHERE key = "perf_db_filling_ms"),
             (SELECT CAST(value AS REAL) FROM metadata WHERE key = "perf_db_loading_ms"),
             (SELECT CAST(value AS REAL) FROM metadata WHERE key = "perf_query_ms")
@@ -164,9 +242,10 @@ DataBase::Stats DataBase::getStats() const {
             stats.counters.objects = sqlite3_column_int64(stmt, 3);
             stats.counters.libraries = sqlite3_column_int64(stmt, 4);
             stats.counters.binaries = sqlite3_column_int64(stmt, 5);
-            stats.timings.dbFilling = sqlite3_column_double(stmt, 6);
-            stats.timings.dbLoading = sqlite3_column_double(stmt, 7);
-            stats.timings.query = sqlite3_column_double(stmt, 8);
+            stats.counters.inputs = sqlite3_column_int64(stmt, 6);
+            stats.timings.dbFilling = sqlite3_column_double(stmt, 7);
+            stats.timings.dbLoading = sqlite3_column_double(stmt, 8);
+            stats.timings.query = sqlite3_column_double(stmt, 9);
         }
         sqlite3_finalize(stmt);
     }
@@ -271,6 +350,13 @@ bool DataBase::m_createSchema() {
             value TEXT
         );
 
+        CREATE TABLE IF NOT EXISTS file_extensions (
+            id INTEGER PRIMARY KEY,
+            ext TEXT NOT NULL,
+            type INTEGER NOT NULL, -- 1=SOURCE, 2=HEADER, 6=INPUT, 4=LIBRARY
+            UNIQUE(ext, type)
+        );
+
         CREATE INDEX IF NOT EXISTS idx_links_to ON links(to_id);
         CREATE INDEX IF NOT EXISTS idx_links_from ON links(from_id);
         CREATE INDEX IF NOT EXISTS idx_targets_source ON targets(type) WHERE type = 1; -- the source type
@@ -278,6 +364,7 @@ bool DataBase::m_createSchema() {
         CREATE INDEX IF NOT EXISTS idx_targets_object ON targets(type) WHERE type = 3; -- the object type
         CREATE INDEX IF NOT EXISTS idx_targets_library ON targets(type) WHERE type = 4; -- the library type
         CREATE INDEX IF NOT EXISTS idx_targets_binary ON targets(type) WHERE type = 5; -- the binary type
+        CREATE INDEX IF NOT EXISTS idx_targets_input ON targets(type) WHERE type = 6; -- the input type
     )";
     return m_exec(schema);
 }

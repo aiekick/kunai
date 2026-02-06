@@ -10,8 +10,6 @@
  */
 
 #include <app/model/model.h>
-#include <app/parsers/build_parser.h>
-#include <app/parsers/deps_parser.h>
 
 #include <ezlibs/ezSha.hpp>
 
@@ -46,9 +44,6 @@ public:
     Loader(const Loader&) = delete;
     Loader& operator=(const Loader&) = delete;
 
-    // Check if database needs rebuild based on SHA1 changes
-    Status checkStatus(const std::filesystem::path& buildDir);
-
     // get the last error
     std::string getError() const;
 
@@ -58,11 +53,14 @@ public:
     std::vector<std::string> getPointedTargetsByType(const std::vector<std::string>& sourcePaths, datas::TargetType aTargetType) ;
 
 private:
+    // Check if database needs rebuild based on file date and SHA1 changes
+    void m_checkStatus(const std::filesystem::path& buildDir, bool aForceRebuild, Loader::Status& aoStatus);
+
     // compute the sah1 of a file
     std::string m_computeSha1(const std::filesystem::path& filepath);
 
     // load ninja file in database
-    bool m_load(const std::filesystem::path& buildDir, bool aRebuild);
+    bool m_load(const std::filesystem::path& buildDir, bool aForceRebuild);
 };
 
 }  // namespace ninja

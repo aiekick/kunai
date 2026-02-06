@@ -15,14 +15,7 @@ inline std::set<std::string> SOURCE_FILE_EXTS{
     ".cc",    // C++ source (GNU)
     ".cpp",   // C++ source (standard)
     ".cxx",   // C++ source (alternative)
-    ".c++",   // C++ source (alternative)
-    ".C",     // C++ source (case-sensitive systems)
     ".inl",   // Inline implementations
-    ".ixx",   // C++20 module interface
-    ".cppm",  // C++20 module (MSVC)
-    ".ccm",   // C++20 module
-    ".cxxm",  // C++20 module
-    ".c++m"   // C++20 module
 };
 
 inline std::set<std::string> HEADER_FILE_EXTS{
@@ -30,13 +23,17 @@ inline std::set<std::string> HEADER_FILE_EXTS{
     ".hh",   // C++ header (GNU)
     ".hpp",  // C++ header (standard)
     ".hxx",  // C++ header (alternative)
-    ".h++",  // C++ header (alternative)
-    ".H",    // C++ header (case-sensitive systems)
     ".tpp",  // Template implementations
-    ".tcc",  // Template implementations (alternative)
-    ".ipp",  // Inline/implementation header
-    ".inl",  // Inline header (parfois utilisé aussi comme header)
-    ".inc"   // Include file (utilisé dans certains projets)
+    ".inc"   // Include file (utilisï¿½ dans certains projets)
+};
+
+inline std::set<std::string> INPUTS_FILE_EXTS{
+    ".ini",  // text params file
+    ".log",  // log file
+    ".txt",  // text params file
+    ".xml",  // xml params file
+    ".csv",  // csv params
+    ".bin",  // binary params file
 };
 
 inline std::set<std::string> LIBRARY_FILE_EXTS{
@@ -46,7 +43,7 @@ inline std::set<std::string> LIBRARY_FILE_EXTS{
     ".lib",       // Static library (Windows) ou import library
     ".dll",       // Dynamic-link library (Windows)
     ".dll.a",     // Import library (MinGW)
-    ".framework"  // Framework bundle (macOS) - techniquement un répertoire
+    ".framework"  // Framework bundle (macOS) - techniquement un rï¿½pertoire
 };
 
 enum class TargetType {
@@ -55,22 +52,8 @@ enum class TargetType {
     HEADER,
     OBJECT,
     LIBRARY,
-    BINARY
-};
-
-struct BuildLink {
-    std::string rule;                        // rule name
-    std::string target;                      // first target
-    std::vector<std::string> targets;        // all targets
-    std::vector<std::string> explicit_deps;  // explicit deps
-    std::vector<std::string> implicit_deps;  // After | in build rule
-    std::vector<std::string> order_only;     // After || in build rule
-};
-
-struct DepsEntry {
-    uint64_t mtime{};
-    std::string target;
-    std::vector<std::string> deps;
+    BINARY,
+    INPUT
 };
 
 }  // namespace datas

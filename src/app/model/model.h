@@ -1,8 +1,9 @@
 #pragma once
 
-#include <sqlite3/sqlite3.hpp>
-
 #include <app/headers/defs.hpp>
+#include <app/interfaces/i_cmake_entry_wirter.h>
+#include <app/interfaces/i_ninja_build_writer.h>
+#include <app/interfaces/i_ninja_deps_writer.h>
 
 #include <string>
 #include <vector>
@@ -11,9 +12,14 @@
 #include <filesystem>
 #include <type_traits>
 
-namespace kunai {
+struct sqlite3;
 
-class DataBase {
+namespace kunai {
+namespace cmake {
+    struct CMakeTarget;  // Forward declaration
+}
+
+class DataBase : public ninja::IBuildWriter, public ninja::IDepsWriter, public cmake::ITargetWriter {
 public:
     struct Stats {
         struct Counter {
@@ -23,6 +29,7 @@ public:
             int64_t objects{};
             int64_t libraries{};
             int64_t binaries{};
+            int64_t inputs{};
         } counters;
         struct Timing {
             double dbFilling{};
@@ -33,11 +40,7 @@ public:
 
 private:
     struct SqliteDeleter {
-        void operator()(sqlite3* apDB) {
-            if (apDB) {
-                sqlite3_close(apDB);
-            }
-        }
+        void operator()(sqlite3* apDB);
     };
     std::unique_ptr<sqlite3, SqliteDeleter> mp_db;
     mutable std::stringstream m_error;
@@ -60,8 +63,14 @@ public:
 
     // Insertions
     void clear();
-    void insertBuildLink(const datas::BuildLink& link);
-    void insertDepsEntry(const datas::DepsEntry& deps);
+    void insertNinjaBuildLink(const ninja::IBuildWriter::BuildLink& link) override;
+    void insertNinjaDepsEntry(const ninja::IDepsWriter::DepsEntry& deps) override;
+    void insertCMakeTarget(const cmake::ITargetWriter::Target& target) override;
+
+    // File extension management
+    void addFileExtension(const std::string& ext, datas::TargetType type) override;
+    datas::TargetType getFileExtensionType(const std::string& ext) const override;
+    void initializeDefaultExtensions();
 
     // Metadata
     void setMetadata(const std::string& key, const std::string& value);
