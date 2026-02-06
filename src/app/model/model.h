@@ -17,7 +17,7 @@ namespace cmake {
     struct CMakeTarget;  // Forward declaration
 }
 
-class DataBase : public IDataBaseWriter {
+class DataBase : public IBuildLinkWriter, public IDepsEntryWriter, public ICMakeTargetWriter {
 public:
     struct Stats {
         struct Counter {

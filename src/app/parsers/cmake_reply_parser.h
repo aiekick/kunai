@@ -24,12 +24,12 @@ class CMakeReplyParser {
 public:
     static std::pair<std::unique_ptr<CMakeReplyParser>, std::string> create(
         const std::string& aBuildDir,
-        IDataBaseWriter* apDbWriter);
+        ICMakeTargetWriter* apDbWriter);
 
 private:
     std::stringstream m_error;
     std::string m_buildDir;
-    IDataBaseWriter* mp_dbWriter;
+    ICMakeTargetWriter* mp_dbWriter;
 
 public:
     CMakeReplyParser() = default;

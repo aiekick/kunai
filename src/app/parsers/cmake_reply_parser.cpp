@@ -12,7 +12,7 @@ namespace cmake {
 
 std::pair<std::unique_ptr<CMakeReplyParser>, std::string> CMakeReplyParser::create(
     const std::string& aBuildDir,
-    IDataBaseWriter* apDbWriter) {
+    ICMakeTargetWriter* apDbWriter) {
     auto pRet = std::make_unique<CMakeReplyParser>();
     pRet->mp_dbWriter = apDbWriter;
     std::string error;

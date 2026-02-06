@@ -5,7 +5,7 @@ namespace ninja {
 
 std::pair<std::unique_ptr<DepsParser>, std::string> DepsParser::create(
     const std::string& aFilePathName,
-    IDataBaseWriter* apDbWriter) {
+    IDepsEntryWriter* apDbWriter) {
     auto pRet = std::make_unique<DepsParser>();
     pRet->mp_dbWriter = apDbWriter;
     std::string error;

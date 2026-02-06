@@ -7,7 +7,7 @@ namespace ninja {
 
 std::pair<std::unique_ptr<BuildParser>, std::string> BuildParser::create(
     const std::string& aFilePathName,
-    IDataBaseWriter* apDbWriter) {
+    IBuildLinkWriter* apDbWriter) {
     auto pRet = std::make_unique<BuildParser>();
     pRet->mp_dbWriter = apDbWriter;
     std::string error;

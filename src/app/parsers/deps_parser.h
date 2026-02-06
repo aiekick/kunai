@@ -22,12 +22,12 @@ public:
 
     static std::pair<std::unique_ptr<DepsParser>, std::string> create(
         const std::string& aFilePathName,
-        IDataBaseWriter* apDbWriter);
+        IDepsEntryWriter* apDbWriter);
 
 private:
     ez::BinBuf m_binBuf;
     std::stringstream m_error;
-    IDataBaseWriter* mp_dbWriter;
+    IDepsEntryWriter* mp_dbWriter;
     std::vector<std::string> m_paths;                  // ID -> path
     std::unordered_map<uint32_t, size_t> m_pathIndex;  // ID -> index in m_paths
 

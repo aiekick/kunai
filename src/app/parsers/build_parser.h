@@ -1,5 +1,4 @@
 #pragma once
-#pragma once
 
 #include <app/headers/defs.hpp>
 #include <app/model/database_writer.h>
@@ -19,12 +18,12 @@ class BuildParser {
 public:
     static std::pair<std::unique_ptr<BuildParser>, std::string> create(
         const std::string& aFilePathName,
-        IDataBaseWriter* apDbWriter);
+        IBuildLinkWriter* apDbWriter);
 
 private:
     std::stringstream m_error;
     std::string m_baseDir;
-    IDataBaseWriter* mp_dbWriter;
+    IBuildLinkWriter* mp_dbWriter;
     std::unordered_map<std::string, std::string> m_globalVars;
     std::unordered_set<std::string> m_parsedFiles;  // Avoid parsing same file twice
 
