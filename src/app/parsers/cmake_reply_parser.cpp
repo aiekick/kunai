@@ -10,8 +10,11 @@ namespace fs = std::filesystem;
 namespace kunai {
 namespace cmake {
 
-std::pair<std::unique_ptr<CMakeReplyParser>, std::string> CMakeReplyParser::create(const std::string& aBuildDir) {
+std::pair<std::unique_ptr<CMakeReplyParser>, std::string> CMakeReplyParser::create(
+    const std::string& aBuildDir,
+    ICMakeTargetWriter* apDbWriter) {
     auto pRet = std::make_unique<CMakeReplyParser>();
+    pRet->mp_dbWriter = apDbWriter;
     std::string error;
     if (!pRet->m_parse(aBuildDir)) {
         error = pRet->getError();
@@ -20,16 +23,8 @@ std::pair<std::unique_ptr<CMakeReplyParser>, std::string> CMakeReplyParser::crea
     return std::make_pair(std::move(pRet), error);
 }
 
-const std::vector<CMakeTarget>& CMakeReplyParser::getTargets() const {
-    return m_targets;
-}
-
 std::string CMakeReplyParser::getError() const {
     return m_error.str();
-}
-
-bool CMakeReplyParser::empty() const {
-    return m_targets.empty();
 }
 
 bool CMakeReplyParser::m_parse(const std::string& aBuildDir) {
@@ -176,7 +171,10 @@ bool CMakeReplyParser::m_parseCodeModel(const std::string& aCodeModelPath) {
         CMakeTarget target;
         fs::path targetPath = replyDir / targetFile;
         if (m_parseTarget(targetPath.string(), target)) {
-            m_targets.push_back(std::move(target));
+            // Insert directly to database during parsing
+            if (mp_dbWriter) {
+                mp_dbWriter->insertCMakeTarget(target);
+            }
         }
     }
 

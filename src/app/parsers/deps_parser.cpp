@@ -3,8 +3,11 @@
 namespace kunai {
 namespace ninja {
 
-std::pair<std::unique_ptr<DepsParser>, std::string> DepsParser::create(const std::string& aFilePathName) {
+std::pair<std::unique_ptr<DepsParser>, std::string> DepsParser::create(
+    const std::string& aFilePathName,
+    IDepsEntryWriter* apDbWriter) {
     auto pRet = std::make_unique<DepsParser>();
+    pRet->mp_dbWriter = apDbWriter;
     std::string error;
     if (!pRet->m_parse(aFilePathName)) {
         error = pRet->getError();
@@ -13,31 +16,15 @@ std::pair<std::unique_ptr<DepsParser>, std::string> DepsParser::create(const std
     return std::make_pair(std::move(pRet), error);
 }
 
-const std::vector<datas::DepsEntry>& DepsParser::getEntries() const {  //
-    return m_entries;
-}
-
 std::string DepsParser::getError() const {  //
     return m_error.str();
 }
 
 // Utility: get all paths that depend on a given source
 std::vector<std::string> DepsParser::getDepsForFile(const std::string& aSourceFile) const {
-    std::vector<std::string> ret;
-    std::string suffix = "/" + aSourceFile;
-    for (const auto& entry : m_entries) {
-        for (const auto& dep : entry.deps) {
-            if (dep == aSourceFile || (dep.size() >= suffix.size() && dep.compare(dep.size() - suffix.size(), suffix.size(), suffix) == 0)) {
-                ret.push_back(entry.target);
-                break;
-            }
-        }
-    }
-    return ret;
-}
-
-bool DepsParser::empty() const {
-    return m_entries.empty();
+    // This method is not used in the refactored version since entries are written directly to DB
+    // Keep it for now for backward compatibility, but it won't work properly
+    return std::vector<std::string>();
 }
 
 bool DepsParser::m_parse(const std::string& aFilePathName) {
@@ -137,7 +124,10 @@ bool DepsParser::m_parse(const std::string& aFilePathName) {
                 }
             }
 
-            m_entries.push_back(std::move(entry));
+            // Insert directly to database during parsing
+            if (mp_dbWriter) {
+                mp_dbWriter->insertDepsEntry(entry);
+            }
         }
     }
 

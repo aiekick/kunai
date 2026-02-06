@@ -1,6 +1,7 @@
 #pragma once
 
 #include <app/headers/defs.hpp>
+#include <app/model/database_writer.h>
 
 #include <string>
 #include <vector>
@@ -21,23 +22,21 @@ struct CMakeTarget {
 
 class CMakeReplyParser {
 public:
-    static std::pair<std::unique_ptr<CMakeReplyParser>, std::string> create(const std::string& aBuildDir);
+    static std::pair<std::unique_ptr<CMakeReplyParser>, std::string> create(
+        const std::string& aBuildDir,
+        ICMakeTargetWriter* apDbWriter);
 
 private:
     std::stringstream m_error;
     std::string m_buildDir;
-    std::vector<CMakeTarget> m_targets;
+    ICMakeTargetWriter* mp_dbWriter;
 
 public:
     CMakeReplyParser() = default;
     CMakeReplyParser(const CMakeReplyParser&) = delete;
     CMakeReplyParser& operator=(const CMakeReplyParser&) = delete;
 
-    const std::vector<CMakeTarget>& getTargets() const;
     std::string getError() const;
-
-    // Is Empty
-    bool empty() const;
 
 private:
     bool m_parse(const std::string& aBuildDir);

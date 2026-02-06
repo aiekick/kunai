@@ -1,7 +1,7 @@
 #pragma once
-#pragma once
 
 #include <app/headers/defs.hpp>
+#include <app/model/database_writer.h>
 
 #include <string>
 #include <vector>
@@ -16,12 +16,14 @@ namespace ninja {
 
 class BuildParser {
 public:
-    static std::pair<std::unique_ptr<BuildParser>, std::string> create(const std::string& aFilePathName);
+    static std::pair<std::unique_ptr<BuildParser>, std::string> create(
+        const std::string& aFilePathName,
+        IBuildLinkWriter* apDbWriter);
 
 private:
     std::stringstream m_error;
     std::string m_baseDir;
-    std::vector<datas::BuildLink> m_links;
+    IBuildLinkWriter* mp_dbWriter;
     std::unordered_map<std::string, std::string> m_globalVars;
     std::unordered_set<std::string> m_parsedFiles;  // Avoid parsing same file twice
 
@@ -30,15 +32,11 @@ public:
     BuildParser(const BuildParser&) = delete;
     BuildParser& operator=(const BuildParser&) = delete;
 
-    const std::vector<datas::BuildLink>& getLinks() const;
     std::string getError() const;
 
     // Get all targets that directly depend on a given path
     std::vector<std::string> getDirectDeps(const std::string& aPath) const;
     std::vector<std::string> getDirectDeps(const std::vector<std::string>& aPaths) const;
-
-    // Is Empty
-    bool empty() const;
 
 private:
     std::string m_getDirectory(const std::string& aFilePathName);
