@@ -24,9 +24,12 @@ bool App::init(int32_t argc, char** argv) {
     m_args = ez::Args(kunai_Label, "--help");
     m_args.addHeader("parse Ninja files and Find which executables to rebuild for changed file(s)");
 
-    m_args.addPositional("build_dir").help("The build directory", "<build_dir>");
+    m_args.addPositional("build-dir").help("The build directory", "<build-dir>");
     m_args.addOptional("-r/--rebuild").help("Force the kunia database rebuild", {});
     m_args.addOptional("-t/--time").help("print the time perf of the command", {});
+    m_args.addOptional("-se/--sources-exts").delimiter(' ').arrayUnlimited().help("set the sources exts. default is {.c,.cc,.cpp,.cxx,.inl}", "<sources-exts>");
+    m_args.addOptional("-he/--headers-exts").delimiter(' ').arrayUnlimited().help("set the headers exts. default is {.h,.hh,.hpp,.hxx,.tpp,.inc}", "<headers-exts>");
+    m_args.addOptional("-ie/--inputs-exts").delimiter(' ').arrayUnlimited().help("set the inputs exts. default is {.init,.log,.txt,.xml,.csv,.bin}", "<inputs-exts>");
 
     // command stats
     m_args.addCommand("stats").help("Get stats of the kunai database", {});
@@ -47,19 +50,19 @@ bool App::init(int32_t argc, char** argv) {
     cmd_pointed.addOptional("-h/--headers").help("Get headers targets", {});
     cmd_pointed.addOptional("--match").delimiter(' ').help("match pattern for filtering targets (ex : --match test_*). not case sensitive", "<pattern>");
     cmd_pointed.addPositional("source_files")
-        .help("The source file non case sensitive pattern. Can be a sub-string without wildcards", "<source_files>")
+        .help("The source file non case sensitive pattern. Can be a sub-string without wildcards", "<source-files>")
         .arrayUnlimited();
 
     if (m_args.parse(argc, argv)) {
         // build dir
-        auto build_dir = m_args.getValue<std::string>("build_dir");
-        if (build_dir == ".") {
-            build_dir = fs::current_path().string();
+        auto buildDir = m_args.getValue<std::string>("build-dir");
+        if (buildDir == ".") {
+            buildDir = fs::current_path().string();
         }
-        if (build_dir.back() == '/') {
-            build_dir = build_dir.substr(0U, build_dir.size() - 1U);
+        if (buildDir.back() == '/') {
+            buildDir = buildDir.substr(0U, buildDir.size() - 1U);
         }
-        m_buildDir = build_dir;
+        m_buildDir = buildDir;
 
         return true;
     } else {
@@ -118,6 +121,7 @@ int32_t App::m_cmdStats() const {
         tbl.addRow({"Objects", ez::str::toStr(stats.counters.objects)});
         tbl.addRow({"Libraries", ez::str::toStr(stats.counters.libraries)});
         tbl.addRow({"Binaries", ez::str::toStr(stats.counters.binaries)});
+        tbl.addRow({"Inputs", ez::str::toStr(stats.counters.inputs)});
         tbl.print("", std::cout);
     }
     {
