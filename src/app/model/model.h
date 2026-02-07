@@ -1,7 +1,9 @@
 #pragma once
 
 #include <app/headers/defs.hpp>
-#include <app/model/database_writer.h>
+#include <app/interfaces/i_cmake_entry_wirter.h>
+#include <app/interfaces/i_ninja_build_writer.h>
+#include <app/interfaces/i_ninja_deps_writer.h>
 
 #include <string>
 #include <vector>
@@ -17,7 +19,7 @@ namespace cmake {
     struct CMakeTarget;  // Forward declaration
 }
 
-class DataBase : public IBuildLinkWriter, public IDepsEntryWriter, public ICMakeTargetWriter {
+class DataBase : public ninja::IBuildWriter, public ninja::IDepsWriter, public cmake::ITargetWriter {
 public:
     struct Stats {
         struct Counter {
@@ -61,9 +63,9 @@ public:
 
     // Insertions
     void clear();
-    void insertBuildLink(const datas::BuildLink& link) override;
-    void insertDepsEntry(const datas::DepsEntry& deps) override;
-    void insertCMakeTarget(const cmake::CMakeTarget& target) override;
+    void insertNinjaBuildLink(const ninja::IBuildWriter::BuildLink& link) override;
+    void insertNinjaDepsEntry(const ninja::IDepsWriter::DepsEntry& deps) override;
+    void insertCMakeTarget(const cmake::ITargetWriter::Target& target) override;
 
     // File extension management
     void addFileExtension(const std::string& ext, datas::TargetType type) override;

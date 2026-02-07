@@ -5,8 +5,6 @@
 #include <ezlibs/ezStr.hpp>
 #include <ezlibs/ezTime.hpp>
 
-#include <app/parsers/cmake_reply_parser.h>
-
 #include <string>
 #include <vector>
 
@@ -74,7 +72,7 @@ void DataBase::clear() {
     m_exec("DELETE FROM metadata;");
 }
 
-void DataBase::insertBuildLink(const BuildLink& link) {
+void DataBase::insertNinjaBuildLink(const ninja::IBuildWriter::BuildLink& link) {
     const auto type = m_getTargetType(link.rule, link.target);
     if (type != TargetType::NOT_SUPPORTED) {
         const int64_t targetId = m_getOrCreateNode(link.target, type);
@@ -104,7 +102,7 @@ void DataBase::insertBuildLink(const BuildLink& link) {
     }
 }
 
-void DataBase::insertDepsEntry(const DepsEntry& deps) {
+void DataBase::insertNinjaDepsEntry(const ninja::IDepsWriter::DepsEntry& deps) {
     const auto type = m_getTargetType("", deps.target);
     if (type != TargetType::NOT_SUPPORTED) {
         const int64_t targetId = m_getOrCreateNode(deps.target, type);
@@ -118,22 +116,9 @@ void DataBase::insertDepsEntry(const DepsEntry& deps) {
     }
 }
 
-void DataBase::insertCMakeTarget(const cmake::CMakeTarget& target) {
-    // Determine target type from CMake type
-    TargetType targetType = TargetType::NOT_SUPPORTED;
-    if (target.type == "EXECUTABLE") {
-        targetType = TargetType::BINARY;
-    } else if (target.type == "STATIC_LIBRARY" || target.type == "SHARED_LIBRARY" ||
-               target.type == "MODULE_LIBRARY" || target.type == "OBJECT_LIBRARY") {
-        targetType = TargetType::LIBRARY;
-    }
-
-    if (targetType == TargetType::NOT_SUPPORTED) {
-        return;
-    }
-
+void DataBase::insertCMakeTarget(const cmake::ITargetWriter::Target& target) {
     // Use target name as the target node
-    const int64_t targetId = m_getOrCreateNode(target.name, targetType);
+    const int64_t targetId = m_getOrCreateNode(target.name, target.type);
 
     // Link all source files to this target
     for (const auto& source : target.sources) {
@@ -196,6 +181,9 @@ void DataBase::initializeDefaultExtensions() {
     }
     for (const auto& ext : LIBRARY_FILE_EXTS) {
         addFileExtension(ext, TargetType::LIBRARY);
+    }
+    for (const auto& ext : INPUTS_FILE_EXTS) {
+        addFileExtension(ext, TargetType::INPUT);
     }
 }
 
